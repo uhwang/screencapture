@@ -1,5 +1,5 @@
 # screencapture
-Screen Capture Python GUI Program
+Screen Capture Python GUI Program:
 PyQt5, keyboard, PIL, pyautogui
 
 YouTube Video: https://youtu.be/8PAwOvxEqBM
