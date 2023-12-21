@@ -1,5 +1,8 @@
 # screencapture
-Screen Capture Python Program
+Screen Capture Python GUI Program
+PyQt5, keyboard, PIL, pyautogui
+
+YouTube Video: https://youtu.be/8PAwOvxEqBM
 
 1. <img width="157" alt="capture-01" src="https://github.com/uhwang/screencapture/assets/43251090/36c542a9-7d85-4f91-bbef-922bfae04dfb">
 
