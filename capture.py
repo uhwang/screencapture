@@ -195,6 +195,7 @@ class ScreenCapture(QWidget):
     
     def set_image_number(self, img_num):
         self.start_number.setText("%d"%img_num)
+        self.image_number = img_num
         
     def print_concurrent_message(self, con_msg):
         self.message.appendPlainText(con_msg)
