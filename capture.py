@@ -176,6 +176,7 @@ class ScreenCapture(QWidget):
         os.chdir(path)
 
     def start_capture(self):
+        self.image_number = int(self.start_number.text())
         self.callback = CaptureCallback(
                             self.application.currentText(),
                             self.hot_key.currentText(),
