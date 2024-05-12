@@ -6,8 +6,6 @@
     
     Ref: https://stackoverflow.com/questions/63193311/
          detect-external-keyboard-events-in-pyqt5
-
-
 '''
 import sys
 import os
@@ -155,7 +153,7 @@ class ScreenCapture(QWidget):
         paper.addWidget(QLabel("Auto Save"), 5, 0)
         self.auto_save = QCheckBox()
         paper.addWidget(self.auto_save, 5,1)
-        self.auto_save.stateChanged.connect(self.audosave_state_changed)        
+        self.auto_save.stateChanged.connect(self.autosave_state_changed)        
         paper.addWidget(QLabel("Interval(ms)"), 6, 0)
         self.interval = QLineEdit("0.0")
         self.interval.setEnabled(False)
@@ -191,7 +189,7 @@ class ScreenCapture(QWidget):
         self.setWindowIcon(QIcon(QPixmap(icon_capture.table)))
         self.show()
 
-    def audosave_state_changed(self):
+    def autosave_state_changed(self):
         if self.auto_save.isChecked():
             self.interval.setEnabled(True)
             self.npage_to_save.setEnabled(True)
