@@ -240,11 +240,13 @@ class ScreenCapture(QWidget):
     
     def set_image_number(self, img_num):
         self.start_number.setText("%d"%img_num)
-        self.npage_auto_saved += 1
-        
-        npage = int(self.npage_to_save.text())
-        if npage > 0 and self.npage_auto_saved == npage:
-            self.stop_capture()
+
+        if self.auto_save.isChecked():
+            self.npage_auto_saved += 1
+            npage = int(self.npage_to_save.text())
+            
+            if npage > 0 and self.npage_auto_saved == npage:
+                self.stop_capture()
         
     def print_concurrent_message(self, con_msg):
         self.message.appendPlainText(con_msg)
