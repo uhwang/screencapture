@@ -1,5 +1,6 @@
 '''
-    12/20/2023
+    12/20/2023  Initial version
+    05/11/2024  Auto capture added
     
     Uisang Hwang
     
