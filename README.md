@@ -2,7 +2,7 @@
 Screen Capture Python GUI Program:
 PyQt5, keyboard, PIL, pyautogui
 
-1. Normal Capture: 
+1. Manual Capture: 
 https://youtu.be/8PAwOvxEqBM
 2. Auto Capture: 
 https://www.youtube.com/watch?v=wR7umUtaOhM
