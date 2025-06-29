@@ -182,7 +182,6 @@ class MouseCaptureCallback(Callback):
         pyautogui.moveTo(x,y)
         pyautogui.click(x, y)
 
-        
     def esc_watcher(self):
         try:
             while not self._stopped:
@@ -340,15 +339,6 @@ class ScreenCapture(QWidget):
         self.capture_mouse_btn.clicked.connect(self.get_mouse_position)
         paper.addWidget(self.capture_mouse_btn, 8, 2)
         self.capture_mouse_btn.setEnabled(False)
-    
-        #paper.addWidget(QLabel("Click Delay (ms)"), 9, 0)
-        #self.click_delay = QLineEdit("500")
-        #paper.addWidget(self.click_delay, 9, 1)
-        #
-        #paper.addWidget(QLabel("Pages to Click"), 10, 0)
-        #self.mouse_pages = QLineEdit("0")
-        #paper.addWidget(self.mouse_pages, 10, 1)
-
 
         bv = QHBoxLayout()
         
@@ -391,15 +381,10 @@ class ScreenCapture(QWidget):
         self.hide()  # Temporarily hide the window
     
         def on_click(x, y, button, pressed):
-            #if pressed and button == Button.right:
             if pressed:
                 self.mouse_pos = (x, y)
-                #self.message.appendPlainText(f"Mouse position set to: {x}, {y}")
                 self.update_message.emit(f"Mouse position set to: {x}, {y}")
                 listener.stop()
-                #self.show()
-                #self.raise_()
-                #self.activatewindow()
                 self.bring_to_front.emit()
     
         listener = Listener(on_click=on_click)
