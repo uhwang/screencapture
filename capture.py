@@ -1,15 +1,19 @@
 '''
     12/20/2023  Initial version
     05/11/2024  Auto capture added
+    06/28/2024  Mouse capture added with ChatGPT
     
     Uisang Hwang
     
     Ref: https://stackoverflow.com/questions/63193311/
          detect-external-keyboard-events-in-pyqt5
+
+
 '''
 import sys
 import os
-import time
+import time, threading
+from pynput.mouse import Listener, Button
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QSize, QTimer              
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import ( 
@@ -31,6 +35,165 @@ from icons import icon_folder_open, icon_refresh, icon_capture
 hot_key_list = ['f2' , 'f3' , 'f3', 'f4', 
                 'left', 'up', 'right', 'down']
 file_template = "%s-%03d.png"              
+
+def save_screenshot(title, prefix, image_number):
+    win = pygetwindow.getWindowsWithTitle(title)[0]
+    win.activate()
+
+    left, top = win.topleft
+    right, bottom = win.bottomright
+
+    cwd = Path.cwd()
+    pre = prefix
+    
+    temp_path = Path.joinpath(cwd, "%d-tmp.png"%image_number)
+    pyautogui.screenshot(str(temp_path))
+    
+    im = PIL.Image.open(str(temp_path))
+    file = file_template%(pre,image_number)
+    path = Path.joinpath(cwd, file)
+    
+    im = im.crop((left, top, right, bottom))
+    im.save(str(path))
+    Path.unlink(temp_path)
+    return file
+
+class Callback(QObject):
+    print_message  = pyqtSignal(str)
+    number_changed = pyqtSignal(int) 
+    
+    def __init__(self, title, hot_key, img_num, prefix, interval=0):
+        super(Callback, self).__init__()
+        self.title = title
+        self.hot_key = hot_key
+        self.image_number = img_num
+        self.prefix  = prefix
+        self.interval = interval
+        self.timer = None
+
+class KeyboardCaptureCallback(Callback):
+    def __init__(self, title, hot_key, img_num, prefix, interval=0):
+        super(KeyboardCaptureCallback, self).__init__(title, hot_key, img_num, prefix, interval)
+
+        if self.interval > 0:
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.save)
+            self.ipage = 0
+             
+    def save(self):
+        try:
+            file = save_screenshot(self.title, self.prefix, self.image_number)
+        except Exception as e:
+            self.print_message.emit(str(e))
+            
+        self.image_number += 1
+        self.number_changed.emit(self.image_number)       
+        self.print_message.emit("Save ... %s"%file) 
+        if isinstance(self.timer, QTimer):
+            keyboard.send(self.hot_key)
+        time.sleep(0.4)
+            
+    def keyboardEventReceived(self, event):
+        if event.event_type == 'down':
+            if event.name == self.hot_key:
+                self.save()
+                
+    def start(self):
+        # on_press returns a hook that can be used to "disconnect" the callback
+        # function later, if required
+        if isinstance(self.timer, QTimer):
+            self.timer.start(self.interval)
+        else:
+            self.hook = keyboard.on_press(self.keyboardEventReceived)
+        
+    def stop(self):
+        if isinstance(self.timer, QTimer):
+            self.timer.stop()
+            self.timer = None
+        else:
+            keyboard.unhook(self.hook)
+        
+class MouseCaptureCallback(Callback):
+    def __init__(self, mouse_pos, title, hot_key, img_num, prefix, interval=0):
+        super(MouseCaptureCallback, self).__init__(title, hot_key, img_num, prefix, interval)
+        self._stopped = False
+        self.mouse_pos = mouse_pos
+        self.listener = None
+        self.esc_thread = None
+        
+        if self.interval > 0:
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.mouse_click_capture)
+        else:
+            self.listener = Listener(on_click=self.save)
+ 
+    def save(self, x, y, button, pressed):
+        if self._stopped:
+            return False
+            
+        if pressed:
+            try:
+                file = save_screenshot(self.title, self.prefix, self.image_number)
+            except Exception as e:
+                self.print_message.emit(str(e))
+                
+            self.image_number += 1
+            self.number_changed.emit(self.image_number)       
+            self.print_message.emit("Save ... %s"%file) 
+        return True
+        
+    def start(self):
+        self._stopped = False
+        # on_press returns a hook that can be used to "disconnect" the callback
+        # function later, if required
+        if isinstance(self.timer, QTimer):
+            self.timer.start(self.interval)
+            # Start ESC key monitor thread
+            self.esc_thread = threading.Thread(target=self.esc_watcher, daemon=True)
+            self.esc_thread.start() 
+        else:
+            self.listener.start()
+            
+    def stop(self):
+        self._stopped = True
+        if isinstance(self.timer, QTimer):
+            self.timer.stop()
+            self.timer = None
+            self.esc_thread = None
+        else:
+            self.listener.stop()
+            self.listener = None
+            
+    def mouse_click_capture(self):
+        if self._stopped:
+            return
+            
+        try:
+            file = save_screenshot(self.title, self.prefix, self.image_number)
+        except Exception as e:
+            self.print_message.emit(str(e))
+            
+        self.image_number += 1
+        self.number_changed.emit(self.image_number)       
+        self.print_message.emit("Save ... %s"%file) 
+        
+        time.sleep(0.4)  # slight pause before screenshot        
+        x, y = self.mouse_pos
+        pyautogui.moveTo(x,y)
+        pyautogui.click(x, y)
+
+        
+    def esc_watcher(self):
+        try:
+            while not self._stopped:
+                if keyboard.is_pressed('esc'):
+                    self.print_message.emit("Stopped by ESC key.")
+                    #self.stop()
+                    QTimer.singleShot(0, self.stop)  # runs self.stop() on the Qt main thread
+                    break
+                time.sleep(0.1)
+        except Exception as e:
+            self.print_message.emit(f"ESC watcher error: {e}")
 
 class CaptureCallback(QObject):
     print_message  = pyqtSignal(str)
@@ -103,11 +266,15 @@ class CaptureCallback(QObject):
             keyboard.unhook(self.hook)
         
 class ScreenCapture(QWidget):
+    update_message = pyqtSignal(str)
+    bring_to_front = pyqtSignal()
+    
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.image_number = 0
-        self.npage_auto_saved = 0
+        self.callback = None
+        self.update_message.connect(self.message.appendPlainText)
+        self.bring_to_front.connect(self.bring_window_to_front)
         
     def initUI(self):
         self.form_layout = QFormLayout()
@@ -164,6 +331,25 @@ class ScreenCapture(QWidget):
         self.npage_to_save.setEnabled(False)
         paper.addWidget(self.npage_to_save, 7, 1)
         
+        # --- Mouse Click Capture Options ---
+        paper.addWidget(QLabel("Mouse Capture"), 8, 0)
+        self.mouse_capture = QCheckBox()
+        paper.addWidget(self.mouse_capture, 8, 1)
+        self.mouse_capture.stateChanged.connect(self.mouse_capture_state_changed)        
+        self.capture_mouse_btn = QPushButton("Pick Position")
+        self.capture_mouse_btn.clicked.connect(self.get_mouse_position)
+        paper.addWidget(self.capture_mouse_btn, 8, 2)
+        self.capture_mouse_btn.setEnabled(False)
+    
+        #paper.addWidget(QLabel("Click Delay (ms)"), 9, 0)
+        #self.click_delay = QLineEdit("500")
+        #paper.addWidget(self.click_delay, 9, 1)
+        #
+        #paper.addWidget(QLabel("Pages to Click"), 10, 0)
+        #self.mouse_pages = QLineEdit("0")
+        #paper.addWidget(self.mouse_pages, 10, 1)
+
+
         bv = QHBoxLayout()
         
         self.start_capture_btn = QPushButton('Start')
@@ -188,6 +374,36 @@ class ScreenCapture(QWidget):
         self.setWindowTitle("Capture")
         self.setWindowIcon(QIcon(QPixmap(icon_capture.table)))
         self.show()
+        
+    def bring_window_to_front(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
+    
+    def mouse_capture_state_changed(self):
+        if self.mouse_capture.isChecked():
+            self.capture_mouse_btn.setEnabled(True)
+        else:
+            self.capture_mouse_btn.setEnabled(False)
+        
+    def get_mouse_position(self):
+        self.message.appendPlainText("Move your mouse to the desired location and click...")
+        self.hide()  # Temporarily hide the window
+    
+        def on_click(x, y, button, pressed):
+            #if pressed and button == Button.right:
+            if pressed:
+                self.mouse_pos = (x, y)
+                #self.message.appendPlainText(f"Mouse position set to: {x}, {y}")
+                self.update_message.emit(f"Mouse position set to: {x}, {y}")
+                listener.stop()
+                #self.show()
+                #self.raise_()
+                #self.activatewindow()
+                self.bring_to_front.emit()
+    
+        listener = Listener(on_click=on_click)
+        listener.start()
 
     def autosave_state_changed(self):
         if self.auto_save.isChecked():
@@ -218,43 +434,57 @@ class ScreenCapture(QWidget):
         self.npage_auto_saved = 0
         self.image_number = int(self.start_number.text())
         _interval = int(self.interval.text()) if self.auto_save.isChecked() else 0
-        self.callback = CaptureCallback(
-                            self.application.currentText(),
-                            self.hot_key.currentText(),
-                            self.image_number,
-                            self.prefix.text(),
-                            _interval
-                        )
-
+            
+        if self.mouse_capture.isChecked():
+            if not hasattr(self, 'mouse_pos'):
+                self.message.appendPlainText("Mouse position not set.")
+                return
+        
+            self.callback = MouseCaptureCallback(
+                                self.mouse_pos,
+                                self.application.currentText(),
+                                self.hot_key.currentText(),
+                                self.image_number,
+                                self.prefix.text(),
+                                _interval
+                            )            
+        else:
+            self.callback = KeyboardCaptureCallback(
+                                self.application.currentText(),
+                                self.hot_key.currentText(),
+                                self.image_number,
+                                self.prefix.text(),
+                                _interval
+                            )
+    
         self.callback.print_message.connect(self.print_concurrent_message)
         self.callback.number_changed.connect(self.set_image_number)
         self.start_capture_btn.setEnabled(False)
-        self.callback.start()
-        
+        self.callback.start()           
+ 
     def stop_capture(self):
-        if self.callback:
+        if self.callback is not None:
             self.callback.stop()
             self.callback = None
             self.start_capture_btn.setEnabled(True)
             self.message.appendPlainText("Done ...")
-    
+        
     def set_image_number(self, img_num):
         self.start_number.setText("%d"%img_num)
-
-        if self.auto_save.isChecked():
-            self.npage_auto_saved += 1
-            npage = int(self.npage_to_save.text())
-            
-            if npage > 0 and self.npage_auto_saved == npage:
-                self.stop_capture()
         
+        if self.auto_save.isChecked():
+            npage = int(self.npage_to_save.text())
+            self.npage_auto_saved += 1    
+            if npage <= 0 or (npage > 0 and self.npage_auto_saved == npage):
+                self.stop_capture()
+            
     def print_concurrent_message(self, con_msg):
         self.message.appendPlainText(con_msg)
         
 def run_screencapture():
     
     app = QApplication(sys.argv)
-
+    #app.setQuitOnLastWindowClosed(False)
     # --- PyQt4 Only
     #app.setStyle(QStyleFactory.create(u'Motif'))
     #app.setStyle(QStyleFactory.create(u'CDE'))
